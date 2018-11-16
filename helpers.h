@@ -24,5 +24,19 @@
 #define P_DIR(port) PRIMITIVE_CAT(port, DIR)
 #define P_OUT(port) PRIMITIVE_CAT(port, OUT)
 
+// USCI registers calculator
+#define USCI_DIV_INT              (XT2_CLK/UART_BR)
+#define USCI_BR0_VAL              (USCI_DIV_INT & 0x00FF)
+#define USCI_BR1_VAL              ((USCI_DIV_INT >> 8) & 0xFF)
+
+#define USCI_DIV_FRAC_NUMERATOR   (XT2_CLK - (USCI_DIV_INT*UART_BR))
+#define USCI_DIV_FRAC_NUM_X_8     (USCI_DIV_FRAC_NUMERATOR*8)
+#define USCI_DIV_FRAC_X_8         (USCI_DIV_FRAC_NUM_X_8/UART_BR)
+
+#if (((USCI_DIV_FRAC_NUM_X_8-(USCI_DIV_FRAC_X_8*UART_BR))*10)/UART_BR < 5)
+#define USCI_BRS_VAL              (USCI_DIV_FRAC_X_8<< 1)
+#else
+#define USCI_BRS_VAL              ((USCI_DIV_FRAC_X_8+1)<< 1)
+#endif
 
 #endif
