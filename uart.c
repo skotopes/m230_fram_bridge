@@ -1,7 +1,5 @@
 #include "uart.h"
 
-volatile uint8_t echo = 0;
-
 void uart_init() {
 	// Configure pins
 	P_SEL(UART_P) |= UART_RX + UART_TX;
@@ -17,9 +15,10 @@ void uart_init() {
 
 void uart_putc(char c)
 {
-	while (!(UC1IFG & UC_TXIFG(UART_UC)));
 	UC_TXBUF(UART_UC) = c;
-	echo = 1;
+	while (!(UART_IFG & UC_TXIFG(UART_UC)));
+	while (!(UART_IFG & UC_RXIFG(UART_UC)));
+	UART_IFG &= ~UC_RXIFG(UART_UC);
 }
 
 void uart_puts(const char *str)
@@ -32,15 +31,7 @@ void uart_puts(const char *str)
 
 char uart_getc()
 {
-	// Echo cancelation, discard first symbol that arrives after TX was active
-	while (echo) {
-		while (!(UC1IFG & UC_TXIFG(UART_UC)));
-		while (!(UC1IFG & UC_RXIFG(UART_UC)));
-		UC1IFG &= ~UC_RXIFG(UART_UC);
-		echo = 0;
-	}
-
-	while (!(UC1IFG & UC_RXIFG(UART_UC)));
-	UC1IFG &= ~UC_RXIFG(UART_UC);
+	while (!(UART_IFG & UC_RXIFG(UART_UC)));
+	UART_IFG &= ~UC_RXIFG(UART_UC);
 	return UC_RXBUF(UART_UC);
 }

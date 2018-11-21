@@ -6,6 +6,6 @@
 
 void spi_init();
 
-uint8_t spi_xfer_byte(uint8_t data);
+void spi_xfer_bytes(uint8_t *tx_buff, uint8_t tx_xfer, uint8_t *rx_buff, uint8_t rx_xfer);
 
 #endif

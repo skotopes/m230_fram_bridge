@@ -18,6 +18,9 @@
 #define UC_RXBUF(base) PRIMITIVE_CAT(base, RXBUF)
 #define UC_RXIE(base) PRIMITIVE_CAT(base, RXIE)
 
+#define UC_STAT(base) PRIMITIVE_CAT(base, STAT)
+#define UC_IFG(base) PRIMITIVE_CAT(base, IFG)
+
 // Port Registers
 #define P_SEL(port) PRIMITIVE_CAT(port, SEL)
 #define P_REN(port) PRIMITIVE_CAT(port, REN)

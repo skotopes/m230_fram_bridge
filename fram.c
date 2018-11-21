@@ -2,6 +2,16 @@
 #include "uart.h"
 #include "spi.h"
 
+#define FRAM_WREN	0b00000110	// Set Write Enable Latch
+#define FRAM_WRDI	0b00000100	// Reset Write Enable Latch
+#define FRAM_RDSR	0b00000101	// Read Status Register
+#define FRAM_WRSR	0b00000001	// Write Status Register
+#define FRAM_READ	0b00000011	// Read Memory Code
+#define FRAM_WRITE	0b00000010	// Write Memory Code
+
+#define FRAM_TX_SIZE 3
+#define FRAM_RX_SIZE 8
+
 int main() {
 	// Internal watchdog: disable
 	WDTCTL = WDTPW + WDTHOLD;
@@ -30,12 +40,6 @@ int main() {
 	P_DIR(P5) |= BIT5; // Direction output
 	P_OUT(P5) |= BIT5; // Set to high
 
-	// P2.4 uart RX hack
-	P_DIR(P2) |= BIT4; // Direction output
-	// P_REN(P2) |= BIT4; // Enable pull-up
-	P_OUT(P2) |= BIT4; // Set to HIGH
-	// P_OUT(P2) &= ~BIT4; // Set to LOW
-
 	// Watchdog timer
 	TA0CCTL0 = CCIE;
 	TA0CTL = TASSEL_1 + MC_1 + ID_3;	// TASSEL_1: use ACLK, MC_1: upcount, ID_3: divide by 8
@@ -47,26 +51,51 @@ int main() {
 
 	__enable_interrupt();
 
-	uart_puts("Hi\r\n");
 	while (1) {
 		uint16_t fram_addr=0;
 		uint16_t fram_size=0;
+		uint8_t fram_tx[FRAM_TX_SIZE];
+		uint8_t fram_rx[FRAM_RX_SIZE];
+		uint8_t fram_rx_size;
 		char c = uart_getc();
 		switch (c) {
 			case 'P':
 				uart_putc('P');
 				break;
 			case 'R':
+				// address and size to read
 				fram_addr |= (uart_getc() << 8);
 				fram_addr |= (uart_getc() << 0);
 				fram_size |= (uart_getc() << 8);
 				fram_size |= (uart_getc() << 0);
+				// read fram memory
+				while (fram_size != 0) {
+					// Reqest FRAM read from address
+					fram_tx[0] = FRAM_READ;
+					fram_tx[1] = (fram_addr >> 8) & 0x1f;
+					fram_tx[2] = fram_addr & 0xFF;
+					fram_rx_size = (fram_size < FRAM_RX_SIZE) ? fram_size : FRAM_RX_SIZE;
+					// Xfer
+					spi_xfer_bytes(fram_tx, FRAM_TX_SIZE, fram_rx, fram_rx_size);
+					for (uint8_t i=0; i < fram_rx_size; i++) {
+						uart_putc(fram_rx[i]);
+						fram_addr++;
+						fram_size--;
+					}
+				}
+				// END read
+				uart_putc('R');
 				break;
 			case 'W':
+				// address and size to write
 				fram_addr |= (uart_getc() << 8);
 				fram_addr |= (uart_getc() << 0);
 				fram_size |= (uart_getc() << 8);
 				fram_size |= (uart_getc() << 0);
+				// write fram memory
+				while (fram_size != 0) {
+				}
+				uart_putc('W');
 				break;
 		}
 	}
