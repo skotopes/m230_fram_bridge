@@ -19,14 +19,14 @@ void spi_xfer_bytes(uint8_t *tx_buff, uint8_t tx_size, uint8_t *rx_buff, uint8_t
 	// CS low
 	P_OUT(SPI_P) &= ~SPI_CS;
 	// Transmit
-	while (tx_size > 0) {
+	while (tx_size != 0) {
 		UC_TXBUF(SPI_UC) = *tx_buff;
 		while (!(SPI_IFG & UC_TXIFG(SPI_UC)));
 		tx_buff++;
 		tx_size--;
 	}
 	// Recieve
-	while (rx_size > 0) {
+	while (rx_size != 0) {
 		UC_TXBUF(SPI_UC) = 0;
 		while (!(SPI_IFG & UC_RXIFG(SPI_UC)));
 		*rx_buff = UC_RXBUF(SPI_UC);

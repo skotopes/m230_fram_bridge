@@ -21,7 +21,7 @@ class X(object):
 
 	def __call__(self):
 		# Validate address and size
-		if self.address < 0 or self.address > 0x2000:
+		if self.address < 0 or self.address >= 0x2000:
 			print("Invalid args: address must be in between 0x0000 and 0x2000")
 			return
 		if self.size < 1 or self.size > 0x2000:
@@ -54,9 +54,15 @@ class X(object):
 		self.sWrite(b"R")
 		self.sWrite(struct.pack(">H", self.address))
 		self.sWrite(struct.pack(">H", self.size))
-		open(self.file, "wb").write(self.sRead(self.size))
-		if self.sRead(1) != b"R":
+		data = self.sRead(self.size)
+		crc, = struct.unpack("B", self.sRead(1))
+		end = self.sRead(1)
+		comupted_crc = self.crc(data)
+		if crc != comupted_crc:
+			raise XExcpetion("CRC doesn't match {}!={}".format(crc, comupted_crc))
+		if end != b"R":
 			raise XExcpetion("Unexpected response from bridge")
+		open(self.file, "wb").write(data)
 
 	def write(self):
 		self.sWrite(b"W")
@@ -87,6 +93,13 @@ class X(object):
 			if self.debug:
 				print("serial < {}".format(data))
 			return data
+
+	def crc(self, data):
+		crc = 0
+		for i in data:
+			crc += i
+			crc &= 0xFF
+		return crc
 
 if __name__ == "__main__":
 	parser = argparse.ArgumentParser(description="Xfer tool")

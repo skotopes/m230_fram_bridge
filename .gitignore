@@ -1,0 +1,7 @@
+/toolchain/
+*.o
+*.d
+*.elf
+*.hex
+*.map
+*.txt

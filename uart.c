@@ -2,7 +2,7 @@
 
 void uart_init() {
 	// Configure pins
-	P_SEL(UART_P) |= UART_RX + UART_TX;
+	P_SEL(UART_P) |= UART_TX + UART_RX;
 	// Set clock source to SMCLK and switch to reset state
 	UC_CTL1(UART_UC) |= UCSSEL_2 + UCSWRST;
 	// Set baud rate (dividers calculated based on config values)
@@ -15,10 +15,13 @@ void uart_init() {
 
 void uart_putc(char c)
 {
+	// Disable RX pin
+	P_SEL(UART_P) &= ~UART_RX;
+	// Write to TX
 	UC_TXBUF(UART_UC) = c;
 	while (!(UART_IFG & UC_TXIFG(UART_UC)));
-	while (!(UART_IFG & UC_RXIFG(UART_UC)));
-	UART_IFG &= ~UC_RXIFG(UART_UC);
+	// Enable RX pin
+	P_SEL(UART_P) |= UART_RX;
 }
 
 void uart_puts(const char *str)
@@ -31,7 +34,9 @@ void uart_puts(const char *str)
 
 char uart_getc()
 {
+	// Read
 	while (!(UART_IFG & UC_RXIFG(UART_UC)));
+	char c = UC_RXBUF(UART_UC);
 	UART_IFG &= ~UC_RXIFG(UART_UC);
-	return UC_RXBUF(UART_UC);
+	return c;
 }

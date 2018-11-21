@@ -9,8 +9,7 @@
 #define FRAM_READ	0b00000011	// Read Memory Code
 #define FRAM_WRITE	0b00000010	// Write Memory Code
 
-#define FRAM_TX_SIZE 3
-#define FRAM_RX_SIZE 8
+#define FRAM_BUFFER 64
 
 int main() {
 	// Internal watchdog: disable
@@ -54,9 +53,9 @@ int main() {
 	while (1) {
 		uint16_t fram_addr=0;
 		uint16_t fram_size=0;
-		uint8_t fram_tx[FRAM_TX_SIZE];
-		uint8_t fram_rx[FRAM_RX_SIZE];
+		uint8_t fram_buffer[FRAM_BUFFER];
 		uint8_t fram_rx_size;
+		uint8_t crc=0;
 		char c = uart_getc();
 		switch (c) {
 			case 'P':
@@ -71,19 +70,21 @@ int main() {
 				// read fram memory
 				while (fram_size != 0) {
 					// Reqest FRAM read from address
-					fram_tx[0] = FRAM_READ;
-					fram_tx[1] = (fram_addr >> 8) & 0x1f;
-					fram_tx[2] = fram_addr & 0xFF;
-					fram_rx_size = (fram_size < FRAM_RX_SIZE) ? fram_size : FRAM_RX_SIZE;
+					fram_buffer[0] = FRAM_READ;
+					fram_buffer[1] = (fram_addr >> 8) & 0x1f;
+					fram_buffer[2] = fram_addr & 0xFF;
+					fram_rx_size = (fram_size < FRAM_BUFFER) ? fram_size : FRAM_BUFFER;
 					// Xfer
-					spi_xfer_bytes(fram_tx, FRAM_TX_SIZE, fram_rx, fram_rx_size);
+					spi_xfer_bytes(fram_buffer, 3, fram_buffer, fram_rx_size);
 					for (uint8_t i=0; i < fram_rx_size; i++) {
-						uart_putc(fram_rx[i]);
+						crc += fram_buffer[i];
+						uart_putc(fram_buffer[i]);
 						fram_addr++;
 						fram_size--;
 					}
 				}
 				// END read
+				uart_putc(crc);
 				uart_putc('R');
 				break;
 			case 'W':
@@ -103,8 +104,8 @@ int main() {
 	return 0;
 }
 
-#pragma vector=TIMER0_A0_VECTOR
-__interrupt void TIMER0_A0_ISR(void)
+__attribute__((__interrupt__(TIMER0_A0_VECTOR)))
+void TIMER0_A0_ISR(void)
 {
 	P_OUT(P5) ^= BIT4; // flip led
 	P_OUT(P5) ^= BIT5; // pet watchdog with a big dildo in the anus
