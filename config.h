@@ -11,7 +11,7 @@
 #define UART_P		P3			// p3
 #define UART_RX		BIT7		// p3.7 UCA1RXD
 #define UART_TX		BIT6		// p3.6 UCA1TXD
-#define UART_BR		(9600)		// 9600
+#define UART_BR		(9600)		// Baudrate
 // SPI
 #define SPI_UC		UCB0		// UCB0
 #define SPI_IFG		IFG2		// IFG2 for UCB0

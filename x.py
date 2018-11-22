@@ -32,7 +32,9 @@ class X(object):
 			return
 		# Open Serial port
 		try:
-			self.serial = serial.Serial(self.port)
+			self.serial = serial.Serial(self.port, 9600)
+			self.serial.flushInput()
+			self.serial.flushOutput()
 		except serial.SerialException as e:
 			print("Failed to open serial port. {}".format(e))
 			return
@@ -51,25 +53,74 @@ class X(object):
 			print("Failure: {}".format(e))
 
 	def read(self):
+		# op code
 		self.sWrite(b"R")
+		# address and size
 		self.sWrite(struct.pack(">H", self.address))
 		self.sWrite(struct.pack(">H", self.size))
-		data = self.sRead(self.size)
+		# Read data
+		total_to_read = self.size
+		data = b""
+		while total_to_read != 0:
+			# Read block size
+			to_read, = struct.unpack("B", self.sRead(1))
+			# Read block data
+			block_data =  self.sRead(to_read)
+			# Read block crc
+			crc, = struct.unpack("B", self.sRead(1))
+			# Compare CRC and confirm or reject
+			comupted_crc = self.crc(block_data)
+			if crc != comupted_crc:
+				raise XExcpetion("Block CRC doesn't match {}!={}".format(crc, comupted_crc))
+			total_to_read -= to_read
+			data += block_data
+			print("Transfered {} bytes, {} left to read".format(to_read, total_to_read))
 		crc, = struct.unpack("B", self.sRead(1))
 		end = self.sRead(1)
 		comupted_crc = self.crc(data)
 		if crc != comupted_crc:
-			raise XExcpetion("CRC doesn't match {}!={}".format(crc, comupted_crc))
+			raise XExcpetion("Data CRC doesn't match {}!={}".format(crc, comupted_crc))
 		if end != b"R":
 			raise XExcpetion("Unexpected response from bridge")
 		open(self.file, "wb").write(data)
 
 	def write(self):
+		# op code
 		self.sWrite(b"W")
+		# address and size
 		self.sWrite(struct.pack(">H", self.address))
 		self.sWrite(struct.pack(">H", self.size))
-		data = self.sRead(size)
+		# Write
+		data = open(self.file, "rb").read()
+		total_to_write = self.size
+		while total_to_write != 0:
+			# Read block size
+			to_write, = struct.unpack("B", self.sRead(1))
+			chunk = data[:to_write]
+			self.sWrite(chunk)
+			self.sWrite(struct.pack("B", self.crc(chunk)))
+			ret = self.sRead(1)
+			if ret == 'O':
+				# Read block crc
+				data = data[to_write:]
+				total_to_write -= to_write
+				print("Transfered {} bytes, {} left to write".format(to_write, total_to_write))
+			elif ret == b'C':
+				raise XExcpetion("Transfered block CRC Error")
+			else:
+				raise XExcpetion("Garbage in the stream")
+
 		if self.sRead(1) != b"W":
+			raise XExcpetion("Unexpected response from bridge")
+
+	def erase(self):
+		# op code
+		self.sWrite(b"E")
+		# address and size
+		self.sWrite(struct.pack(">H", self.address))
+		self.sWrite(struct.pack(">H", self.size))
+		# confirmation
+		if self.sRead(1) != b"E":
 			raise XExcpetion("Unexpected response from bridge")
 
 	def sWrite(self, data):
@@ -77,6 +128,7 @@ class X(object):
 			print("serial > {}".format(data))
 		self.echo += data
 		self.serial.write(data)
+		self.serial.flush()
 
 	def sRead(self, size):
 		echo_len = len(self.echo)
@@ -85,7 +137,7 @@ class X(object):
 			if self.debug:
 				print("serial < {}".format(data))
 			if data[:echo_len] != self.echo:
-				raise Exception("Unexpected data in the stream")
+				raise Exception("Unexpected data in the stream: was expecting {}, got {} ".format(self.echo, data))
 			self.echo = b""
 			return data[echo_len:]
 		else:
@@ -105,7 +157,7 @@ if __name__ == "__main__":
 	parser = argparse.ArgumentParser(description="Xfer tool")
 	parser.add_argument("-d", "--debug", action='store_true', help="Debug")
 	parser.add_argument("--port", help="Serial port")
-	parser.add_argument("command", choices=["read", "write"], help="Command")
+	parser.add_argument("command", choices=["read", "write", "erase"], help="Command")
 	parser.add_argument("address", type=int, help="Memory address to read or write")
 	parser.add_argument("size", type=int, help="Size to read or write")
 	parser.add_argument("file", help="File to write or read")

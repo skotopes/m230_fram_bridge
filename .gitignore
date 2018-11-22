@@ -1,4 +1,5 @@
 /toolchain/
+/venv/
 *.o
 *.d
 *.elf
